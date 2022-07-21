@@ -1,0 +1,33 @@
+syntax="proto3";
+option go_package = "zorrero/blacklist";
+
+service Blacklist {
+  rpc GetBlacklistRecordById(BlacklistRequest) returns (BlacklistRecordDto);
+  rpc GetBlacklistRecordBatch(stream BlacklistRequest) returns (stream BlacklistRecordDto);
+  rpc SaveBlacklistRecord(BlacklistRecordDto) returns (BlacklistRecordDto);
+  rpc SaveBlacklistRecordBatch(stream BlacklistRecordDto) returns (stream BlacklistRecordDto);
+}
+
+message BlacklistRequest {
+  string id = 1;
+}
+
+message BlacklistBatchRequest {
+  repeated string id = 1;
+}
+
+message BlacklistRecordDto {
+  string id = 1;
+  repeated RestrictionDto restrictions = 2;
+}
+
+message RestrictionDto {
+  string client_id = 1;
+  ProductDto product = 2;
+  string added_date = 3;
+}
+
+message ProductDto {
+  string product_name = 1;
+  string product_id = 2;
+}
