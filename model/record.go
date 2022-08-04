@@ -2,12 +2,15 @@ package model
 
 import (
 	blacklist "blacklist/protos"
+	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"time"
 )
 
 type Record struct {
 	id           string
-	restrictions []*Restriction
+	restrictions map[RestrictionKey]*Restriction
 }
 
 type Restriction struct {
@@ -21,60 +24,68 @@ type Product struct {
 	id   string
 }
 
+type RestrictionKey struct {
+	clientId  string
+	productId string
+}
+
+func NewRecord(id string, restrictions map[RestrictionKey]*Restriction) *Record {
+	return &Record{id: id, restrictions: restrictions}
+}
+
 func FromDynamoItem(item map[string]*dynamodb.AttributeValue) (*Record, error) {
-	restrictionsIndex := 0
-	restrictionsList := make([]*Restriction, 0, len(item["restrictions"].L))
-	for restrictionsIndex < len(item["restrictions"].L) {
+	restrictionsMap := make(map[RestrictionKey]*Restriction)
+	for _, dynamoRestriction := range item["restrictions"].L {
 		product := &Product{
-			name: *item["restrictions"].L[restrictionsIndex].M["product"].M["name"].S,
-			id:   *item["restrictions"].L[restrictionsIndex].M["product"].M["id"].S,
+			name: *dynamoRestriction.M["product"].M["name"].S,
+			id:   *dynamoRestriction.M["product"].M["id"].S,
 		}
 		restriction := &Restriction{
-			clientId:  *item["restrictions"].L[restrictionsIndex].M["clientId"].S,
-			addedDate: *item["restrictions"].L[restrictionsIndex].M["addedDate"].S,
+			clientId:  *dynamoRestriction.M["clientId"].S,
+			addedDate: *dynamoRestriction.M["addedDate"].S,
 			product:   product,
 		}
-		restrictionsList = append(restrictionsList, restriction)
+		restrictionsMap[RestrictionKey{clientId: *dynamoRestriction.M["clientId"].S,
+			productId: *dynamoRestriction.M["product"].M["id"].S}] = restriction
 	}
-	record := &Record{
+	return &Record{
 		id:           *item["id"].S,
-		restrictions: restrictionsList,
-	}
-	return record, nil
+		restrictions: restrictionsMap,
+	}, nil
 }
 
 func FromDto(dto *blacklist.BlacklistRecordDto) (*Record, error) {
-	restrictionsIndex := 0
 	restrictionsList := make([]*Restriction, 0, len(dto.Restrictions))
-	for restrictionsIndex < len(dto.Restrictions) {
+	restrictionsMap := make(map[RestrictionKey]*Restriction)
+	for _, dtoRestriction := range dto.Restrictions {
 		product := &Product{
-			name: dto.Restrictions[restrictionsIndex].Product.ProductName,
-			id:   dto.Restrictions[restrictionsIndex].Product.ProductId,
+			name: dtoRestriction.Product.ProductName,
+			id:   dtoRestriction.Product.ProductId,
 		}
 		restriction := &Restriction{
-			clientId:  dto.Restrictions[restrictionsIndex].ClientId,
-			addedDate: dto.Restrictions[restrictionsIndex].AddedDate,
+			clientId:  dtoRestriction.ClientId,
+			addedDate: dtoRestriction.AddedDate,
 			product:   product,
 		}
 		restrictionsList = append(restrictionsList, restriction)
-		restrictionsIndex++
+		restrictionsMap[RestrictionKey{clientId: dtoRestriction.ClientId,
+			productId: dtoRestriction.Product.ProductId}] = restriction
 	}
 	return &Record{
 		id:           dto.Id,
-		restrictions: restrictionsList,
+		restrictions: restrictionsMap,
 	}, nil
 }
 
 func (receiver *Record) ToDynamoItem() map[string]*dynamodb.AttributeValue {
 	restrictions := make([]*dynamodb.AttributeValue, 0, len(receiver.restrictions))
-	restrictionIndex := 0
-	for restrictionIndex < len(receiver.restrictions) {
+	for _, restrictionElement := range receiver.restrictions {
 		product := make(map[string]*dynamodb.AttributeValue)
-		product["name"] = &dynamodb.AttributeValue{S: &receiver.restrictions[restrictionIndex].product.name}
-		product["id"] = &dynamodb.AttributeValue{S: &receiver.restrictions[restrictionIndex].product.id}
+		product["name"] = &dynamodb.AttributeValue{S: &restrictionElement.product.name}
+		product["id"] = &dynamodb.AttributeValue{S: &restrictionElement.product.id}
 		restriction := make(map[string]*dynamodb.AttributeValue)
-		restriction["clientId"] = &dynamodb.AttributeValue{S: &receiver.restrictions[restrictionIndex].clientId}
-		restriction["addedDate"] = &dynamodb.AttributeValue{S: &receiver.restrictions[restrictionIndex].addedDate}
+		restriction["clientId"] = &dynamodb.AttributeValue{S: &restrictionElement.clientId}
+		restriction["addedDate"] = &dynamodb.AttributeValue{S: &restrictionElement.addedDate}
 		restriction["product"] = &dynamodb.AttributeValue{M: product}
 		restrictions = append(restrictions, &dynamodb.AttributeValue{M: restriction})
 	}
@@ -85,23 +96,40 @@ func (receiver *Record) ToDynamoItem() map[string]*dynamodb.AttributeValue {
 }
 
 func (receiver *Record) ToDto() *blacklist.BlacklistRecordDto {
-	restrictionsIndex := 0
 	restrictionsDtoList := make([]*blacklist.RestrictionDto, 0, len(receiver.restrictions))
-	for restrictionsIndex < len(receiver.restrictions) {
+	for _, restrictionElement := range receiver.restrictions {
 		productDto := &blacklist.ProductDto{
-			ProductId:   receiver.restrictions[restrictionsIndex].product.id,
-			ProductName: receiver.restrictions[restrictionsIndex].product.name,
+			ProductId:   restrictionElement.product.id,
+			ProductName: restrictionElement.product.name,
 		}
 		restrictionDto := &blacklist.RestrictionDto{
-			ClientId:  receiver.restrictions[restrictionsIndex].clientId,
-			AddedDate: receiver.restrictions[restrictionsIndex].addedDate,
+			ClientId:  restrictionElement.clientId,
+			AddedDate: restrictionElement.addedDate,
 			Product:   productDto,
 		}
 		restrictionsDtoList = append(restrictionsDtoList, restrictionDto)
-		restrictionsIndex++
 	}
 	return &blacklist.BlacklistRecordDto{
 		Id:           receiver.id,
 		Restrictions: restrictionsDtoList,
 	}
+}
+
+func (receiver *Record) SaveRestriction(clientId, productId, productName string) error {
+	_, present := receiver.restrictions[RestrictionKey{clientId: clientId, productId: productId}]
+	if present {
+		return errors.New(fmt.Sprintf("the given clientId: %s and productId: %s are already in the Record", clientId, productId))
+	}
+	restriction := &Restriction{clientId: clientId, addedDate: time.Now().String(), product: &Product{name: productName, id: productId}}
+	receiver.restrictions[RestrictionKey{clientId: clientId, productId: productId}] = restriction
+	return nil
+}
+
+func (receiver *Record) DeleteRestriction(clientId, productId string) (int, error) {
+	_, present := receiver.restrictions[RestrictionKey{clientId: clientId, productId: productId}]
+	if !present {
+		return 0, errors.New(fmt.Sprintf("the given clientId: %s and productId: %s are not in the Record", clientId, productId))
+	}
+	delete(receiver.restrictions, RestrictionKey{clientId: clientId, productId: productId})
+	return len(receiver.restrictions), nil
 }

@@ -15,6 +15,10 @@ var (
 )
 
 func main() {
+	err := os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
+	if err != nil {
+		log.Fatalf("failed to start: %v", err)
+	}
 	flag.Parse()
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
 	if err != nil {

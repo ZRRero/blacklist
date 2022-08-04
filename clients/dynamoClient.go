@@ -6,9 +6,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"log"
 )
 
-type dynamo struct {
+type Dynamo struct {
 	client dynamodbiface.DynamoDBAPI
 	table  string
 }
@@ -19,17 +20,17 @@ func newSession() (*session.Session, error) {
 	return svc, err
 }
 
-func NewClient(table string) (*dynamo, error) {
+func NewClient(table string) (*Dynamo, error) {
 	// Create AWS Session
 	sess, err := newSession()
 	if err != nil {
 		return nil, err
 	}
-	dynamoClient := &dynamo{dynamodb.New(sess), table}
+	dynamoClient := &Dynamo{dynamodb.New(sess), table}
 	return dynamoClient, nil
 }
 
-func (receiver *dynamo) GetRecordById(id *string) (*model.Record, error) {
+func (receiver *Dynamo) GetRecordById(id *string) (*model.Record, error) {
 	key := make(map[string]*dynamodb.AttributeValue)
 	key["id"] = &dynamodb.AttributeValue{S: id}
 	input := &dynamodb.GetItemInput{
@@ -40,6 +41,9 @@ func (receiver *dynamo) GetRecordById(id *string) (*model.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	if result.Item == nil {
+		return nil, nil
+	}
 	record, err := model.FromDynamoItem(result.Item)
 	if err != nil {
 		return nil, err
@@ -47,9 +51,9 @@ func (receiver *dynamo) GetRecordById(id *string) (*model.Record, error) {
 	return record, nil
 }
 
-func (receiver *dynamo) GetRecordBatchByIds(ids []*string) ([]*model.Record, error) {
+func (receiver *Dynamo) GetRecordBatchByIds(ids []*string) ([]*model.Record, error) {
 	if len(ids) > 25 {
-		return nil, errors.New("ids list has more than dynamo max batch (25)")
+		return nil, errors.New("ids list has more than Dynamo max batch (25)")
 	}
 	input := &dynamodb.BatchGetItemInput{
 		RequestItems: receiver.getBatchRequestFromIds(ids),
@@ -66,11 +70,10 @@ func (receiver *dynamo) GetRecordBatchByIds(ids []*string) ([]*model.Record, err
 	return records, nil
 }
 
-func (receiver *dynamo) parseDynamoRecords(dynamoRecords []map[string]*dynamodb.AttributeValue) ([]*model.Record, error) {
-	index := 0
+func (receiver *Dynamo) parseDynamoRecords(dynamoRecords []map[string]*dynamodb.AttributeValue) ([]*model.Record, error) {
 	records := make([]*model.Record, 0, 25)
-	for index < len(dynamoRecords) {
-		record, err := model.FromDynamoItem(dynamoRecords[index])
+	for _, dynamoRecord := range dynamoRecords {
+		record, err := model.FromDynamoItem(dynamoRecord)
 		if err != nil {
 			return nil, err
 		}
@@ -79,14 +82,12 @@ func (receiver *dynamo) parseDynamoRecords(dynamoRecords []map[string]*dynamodb.
 	return records, nil
 }
 
-func (receiver *dynamo) getBatchRequestFromIds(ids []*string) map[string]*dynamodb.KeysAndAttributes {
-	index := 0
+func (receiver *Dynamo) getBatchRequestFromIds(ids []*string) map[string]*dynamodb.KeysAndAttributes {
 	items := make([]map[string]*dynamodb.AttributeValue, 0, 25)
-	for index < len(ids) {
+	for _, id := range ids {
 		item := make(map[string]*dynamodb.AttributeValue)
-		item["id"] = &dynamodb.AttributeValue{S: ids[index]}
+		item["id"] = &dynamodb.AttributeValue{S: id}
 		items = append(items, item)
-		index++
 	}
 	keyAndAttributes := &dynamodb.KeysAndAttributes{
 		Keys: items,
@@ -96,25 +97,22 @@ func (receiver *dynamo) getBatchRequestFromIds(ids []*string) map[string]*dynamo
 	return requestItems
 }
 
-func (receiver *dynamo) SaveRecord(record *model.Record) (*model.Record, error) {
+func (receiver *Dynamo) SaveRecord(record *model.Record) (*model.Record, error) {
+	log.Printf("Table: %s", receiver.table)
 	input := &dynamodb.PutItemInput{
 		TableName: &receiver.table,
 		Item:      record.ToDynamoItem(),
 	}
-	output, err := receiver.client.PutItem(input)
+	_, err := receiver.client.PutItem(input)
 	if err != nil {
 		return nil, err
 	}
-	result, err := model.FromDynamoItem(output.Attributes)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return record, nil
 }
 
-func (receiver *dynamo) SaveBatchRecords(records []*model.Record) ([]*model.Record, error) {
+func (receiver *Dynamo) SaveBatchRecords(records []*model.Record) ([]*model.Record, error) {
 	if len(records) > 25 {
-		return nil, errors.New("ids list has more than dynamo max batch (25)")
+		return nil, errors.New("ids list has more than Dynamo max batch (25)")
 	}
 	input := &dynamodb.BatchWriteItemInput{
 		RequestItems: receiver.getWriteBatchRequestFromModel(records),
@@ -123,7 +121,10 @@ func (receiver *dynamo) SaveBatchRecords(records []*model.Record) ([]*model.Reco
 	if err != nil {
 		return nil, err
 	}
-	for len(result.UnprocessedItems) == 0 {
+	for len(result.UnprocessedItems) != 0 {
+		input = &dynamodb.BatchWriteItemInput{
+			RequestItems: result.UnprocessedItems,
+		}
 		result, err = receiver.client.BatchWriteItem(input)
 		if err != nil {
 			return nil, err
@@ -132,14 +133,24 @@ func (receiver *dynamo) SaveBatchRecords(records []*model.Record) ([]*model.Reco
 	return records, nil
 }
 
-func (receiver *dynamo) getWriteBatchRequestFromModel(records []*model.Record) map[string][]*dynamodb.WriteRequest {
+func (receiver *Dynamo) getWriteBatchRequestFromModel(records []*model.Record) map[string][]*dynamodb.WriteRequest {
 	items := make(map[string][]*dynamodb.WriteRequest)
-	index := 0
 	requests := make([]*dynamodb.WriteRequest, 0, len(records))
-	for index < len(records) {
-		requests = append(requests, &dynamodb.WriteRequest{PutRequest: &dynamodb.PutRequest{Item: records[index].ToDynamoItem()}})
-		index++
+	for _, record := range records {
+		requests = append(requests, &dynamodb.WriteRequest{PutRequest: &dynamodb.PutRequest{Item: record.ToDynamoItem()}})
 	}
 	items[receiver.table] = requests
 	return items
+}
+
+func (receiver *Dynamo) DeleteRecord(id *string) error {
+	input := &dynamodb.DeleteItemInput{
+		TableName: &receiver.table,
+		Key:       map[string]*dynamodb.AttributeValue{"id": {S: id}},
+	}
+	_, err := receiver.client.DeleteItem(input)
+	if err != nil {
+		return err
+	}
+	return nil
 }
