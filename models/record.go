@@ -1,7 +1,7 @@
-package model
+package models
 
 import (
-	blacklist "blacklist/protos"
+	"blacklist/tools/protos"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"

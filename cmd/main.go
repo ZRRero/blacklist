@@ -1,7 +1,8 @@
 package main
 
 import (
-	blacklist "blacklist/protos"
+	"blacklist/apis"
+	"blacklist/tools/protos"
 	"flag"
 	"fmt"
 	"google.golang.org/grpc"
@@ -27,7 +28,7 @@ func main() {
 	var opts []grpc.ServerOption
 	server := grpc.NewServer(opts...)
 	table := os.Getenv("BLACKLIST_TABLE")
-	blacklist.RegisterBlacklistServer(server, &BlacklistServer{table: table, batchSize: 25})
+	blacklist.RegisterBlacklistServer(server, &apis.BlacklistServer{Table: table, BatchSize: 25})
 	err = server.Serve(listener)
 	if err != nil {
 		return
