@@ -14,7 +14,12 @@ import (
 var (
 	notFound          = "given record %s does not exist"
 	maxLengthExceeded = "maximum batch size is %d and given batch has %d records"
+	idFormat          = "%s%s%s"
 )
+
+func getIdFromRequest(request *blacklist.BlacklistRecordOperationRequest) string {
+	return fmt.Sprintf(idFormat, request.RecordId, request.ClientId, request.ClientId)
+}
 
 type BlacklistServer struct {
 	blacklist.UnimplementedBlacklistServer
@@ -23,22 +28,27 @@ type BlacklistServer struct {
 	Table     string
 }
 
-func (receiver *BlacklistServer) GetBlacklistRecordById(_ context.Context, request *blacklist.BlacklistGetRequest) (*blacklist.BlacklistRecordDto, error) {
+func (receiver *BlacklistServer) GetBlacklistRecord(_ context.Context, request *blacklist.BlacklistRecordOperationRequest) (*blacklist.BlacklistRecordDto, error) {
 	client, err := clients.NewClient(receiver.Table)
 	if err != nil {
 		return nil, err
 	}
-	record, err := client.GetRecordById(&request.Id)
+	id := getIdFromRequest(request)
+	result, err := client.GetRecordById(&id)
 	if err != nil {
 		return nil, err
 	}
-	if record == nil {
-		return nil, errors.New(fmt.Sprintf(notFound, request.Id))
+	if result == nil {
+		return nil, errors.New(fmt.Sprintf(notFound, id))
 	}
-	return record.ToDto(), nil
+	return result.ToDto(), nil
 }
 
 func (receiver *BlacklistServer) GetBlacklistRecordBatch(stream blacklist.Blacklist_GetBlacklistRecordBatchServer) error {
+	client, err := clients.NewClient(receiver.Table)
+	if err != nil {
+		return err
+	}
 	for {
 		in, err := stream.Recv()
 		ids := make([]*string, 0, receiver.BatchSize)
@@ -48,16 +58,19 @@ func (receiver *BlacklistServer) GetBlacklistRecordBatch(stream blacklist.Blackl
 		if err != nil {
 			return err
 		}
-		if len(in.Ids) > receiver.BatchSize {
-			return errors.New(fmt.Sprintf(maxLengthExceeded, receiver.BatchSize, len(in.Ids)))
+		if len(in.Requests) > receiver.BatchSize {
+			return errors.New(fmt.Sprintf(maxLengthExceeded, receiver.BatchSize, len(in.Requests)))
 		}
-		for _, id := range in.Ids {
-			appendId := id
-			ids = append(ids, &appendId)
+		for _, request := range in.Requests {
+			id := getIdFromRequest(request)
+			ids = append(ids, &id)
 		}
-		dtos, err := receiver.getFullRecordsBatch(ids)
-		for _, dto := range dtos {
-			err = stream.Send(dto)
+		records, err := client.GetRecordBatchByIds(ids)
+		if err != nil {
+			return err
+		}
+		for _, record := range records {
+			err = stream.Send(record.ToDto())
 			if err != nil {
 				return err
 			}
@@ -65,52 +78,70 @@ func (receiver *BlacklistServer) GetBlacklistRecordBatch(stream blacklist.Blackl
 	}
 }
 
-func (receiver *BlacklistServer) getFullRecordsBatch(ids []*string) ([]*blacklist.BlacklistRecordDto, error) {
+func (receiver *BlacklistServer) GetBlacklistRecordsQuery(request *blacklist.BlacklistRecordQueriesRequest, stream blacklist.Blacklist_GetBlacklistRecordsQueryServer) error {
+	client, err := clients.NewClient(receiver.Table)
+	if err != nil {
+		return err
+	}
+	queries := make([]*models.Query, 0, 10)
+	for _, query := range request.Queries {
+		queries = append(queries, models.FromQueryRequest(query))
+	}
+	result, err := client.GetRecordsByQueries(queries)
+	if err != nil {
+		return err
+	}
+	for _, record := range result {
+		err := stream.Send(record.ToDto())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (receiver *BlacklistServer) GetBlacklistRecordsBetweenQuery(request *blacklist.BlacklistRecordBetweenQueriesRequest, stream blacklist.Blacklist_GetBlacklistRecordsBetweenQueryServer) error {
+	client, err := clients.NewClient(receiver.Table)
+	if err != nil {
+		return err
+	}
+	queries := make([]*models.BetweenQuery, 0, 10)
+	for _, query := range request.Queries {
+		queries = append(queries, models.FromQueryBetweenRequest(query))
+	}
+	result, err := client.GetRecordsBetweenValues(queries)
+	if err != nil {
+		return err
+	}
+	for _, record := range result {
+		err := stream.Send(record.ToDto())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (receiver *BlacklistServer) SaveBlacklistRecord(_ context.Context, request *blacklist.BlacklistRecordOperationRequest) (*blacklist.BlacklistRecordDto, error) {
 	client, err := clients.NewClient(receiver.Table)
 	if err != nil {
 		return nil, err
 	}
-	result, err := client.GetRecordBatchByIds(ids)
+	record, err := client.SaveRecord(models.NewRecord(request.RecordId, request.ClientId, request.ProductId))
 	if err != nil {
 		return nil, err
 	}
-	dtos, err := receiver.parseDynamoRecordsToBlacklistDto(result)
-	if err != nil {
-		return nil, err
-	}
-	return dtos, nil
-}
-
-func (receiver *BlacklistServer) parseDynamoRecordsToBlacklistDto(records []*models.Record) ([]*blacklist.BlacklistRecordDto, error) {
-	result := make([]*blacklist.BlacklistRecordDto, 0, receiver.BatchSize)
-	index := 0
-	for index < len(records) {
-		result = append(result, records[index].ToDto())
-		index++
-	}
-	return result, nil
-}
-
-func (receiver *BlacklistServer) SaveBlacklistRecord(_ context.Context, request *blacklist.BlacklistRecordDto) (*blacklist.BlacklistRecordDto, error) {
-	client, err := clients.NewClient(receiver.Table)
-	if err != nil {
-		return nil, err
-	}
-	record, err := models.FromDto(request)
-	if err != nil {
-		return nil, err
-	}
-	result, err := client.SaveRecord(record)
-	if err != nil {
-		return nil, err
-	}
-	return result.ToDto(), nil
+	return record.ToDto(), nil
 }
 
 func (receiver *BlacklistServer) SaveBlacklistRecordBatch(stream blacklist.Blacklist_SaveBlacklistRecordBatchServer) error {
+	client, err := clients.NewClient(receiver.Table)
+	if err != nil {
+		return err
+	}
 	for {
-		records := make([]*models.Record, 0, receiver.BatchSize)
 		in, err := stream.Recv()
+		records := make([]*models.Record, 0, receiver.BatchSize)
 		if err == io.EOF {
 			return nil
 		}
@@ -120,16 +151,16 @@ func (receiver *BlacklistServer) SaveBlacklistRecordBatch(stream blacklist.Black
 		if len(in.Requests) > receiver.BatchSize {
 			return errors.New(fmt.Sprintf(maxLengthExceeded, receiver.BatchSize, len(in.Requests)))
 		}
-		for _, dto := range in.Requests {
-			record, err := models.FromDto(dto)
-			if err != nil {
-				return err
-			}
+		for _, request := range in.Requests {
+			record := models.NewRecord(request.RecordId, request.ClientId, request.ProductId)
 			records = append(records, record)
 		}
-		dtos, err := receiver.saveRecordsBatch(records)
-		for _, dto := range dtos {
-			err = stream.Send(dto)
+		result, err := client.SaveBatchRecords(records)
+		if err != nil {
+			return err
+		}
+		for _, recordResult := range result {
+			err = stream.Send(recordResult.ToDto())
 			if err != nil {
 				return err
 			}
@@ -137,124 +168,43 @@ func (receiver *BlacklistServer) SaveBlacklistRecordBatch(stream blacklist.Black
 	}
 }
 
-func (receiver *BlacklistServer) saveRecordsBatch(records []*models.Record) ([]*blacklist.BlacklistRecordDto, error) {
+func (receiver *BlacklistServer) DeleteBlacklistRecord(_ context.Context, request *blacklist.BlacklistRecordOperationRequest) (*blacklist.Empty, error) {
 	client, err := clients.NewClient(receiver.Table)
 	if err != nil {
 		return nil, err
 	}
-	result, err := client.SaveBatchRecords(records)
+	id := getIdFromRequest(request)
+	err = client.DeleteRecord(&id)
 	if err != nil {
 		return nil, err
 	}
-	dtos, err := receiver.parseDynamoRecordsToBlacklistDto(result)
-	if err != nil {
-		return nil, err
-	}
-	return dtos, nil
+	return &blacklist.Empty{}, nil
 }
 
-func (receiver *BlacklistServer) SaveRestrictionIntoRecord(_ context.Context, request *blacklist.SaveRestrictionRequest) (*blacklist.BlacklistRecordDto, error) {
-	client, err := clients.NewClient(receiver.Table)
-	if err != nil {
-		return nil, err
-	}
-	return receiver.saveRestrictionIntoRecord(client, request)
-}
-
-func (receiver *BlacklistServer) saveRestrictionIntoRecord(client *clients.Dynamo, request *blacklist.SaveRestrictionRequest) (*blacklist.BlacklistRecordDto, error) {
-	//Race condition here
-	record, err := client.GetRecordById(&request.RecordId)
-	if err != nil {
-		return nil, err
-	}
-	if record == nil {
-		record = models.NewRecord(request.RecordId, make(map[models.RestrictionKey]*models.Restriction))
-	}
-	err = record.SaveRestriction(request.ClientId, request.Product.ProductId, request.Product.ProductName)
-	if err != nil {
-		return nil, err
-	}
-	result, err := client.SaveRecord(record)
-	if err != nil {
-		return nil, err
-	}
-	return result.ToDto(), nil
-}
-
-func (receiver *BlacklistServer) SaveBatchRestrictionIntoRecord(stream blacklist.Blacklist_SaveBatchRestrictionIntoRecordServer) error {
+func (receiver *BlacklistServer) DeleteBatchBlacklistRecord(stream blacklist.Blacklist_DeleteBatchBlacklistRecordServer) error {
 	client, err := clients.NewClient(receiver.Table)
 	if err != nil {
 		return err
 	}
 	for {
 		in, err := stream.Recv()
+		ids := make([]*string, 0, receiver.BatchSize)
 		if err == io.EOF {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		result, err := receiver.saveRestrictionIntoRecord(client, in)
+		if len(in.Requests) > receiver.BatchSize {
+			return errors.New(fmt.Sprintf(maxLengthExceeded, receiver.BatchSize, len(in.Requests)))
+		}
+		for _, request := range in.Requests {
+			id := getIdFromRequest(request)
+			ids = append(ids, &id)
+		}
+		err = client.DeleteBatchRecords(ids)
 		if err != nil {
 			return err
 		}
-		err = stream.Send(result)
-		if err != nil {
-			return err
-		}
 	}
-}
-
-func (receiver *BlacklistServer) DeleteRestrictionFromRecord(_ context.Context, request *blacklist.DeleteRestrictionRequest) (*blacklist.BlacklistRecordDto, error) {
-	client, err := clients.NewClient(receiver.Table)
-	if err != nil {
-		return nil, err
-	}
-	return receiver.deleteRestrictionFromRecord(client, request)
-}
-
-func (receiver *BlacklistServer) deleteRestrictionFromRecord(client *clients.Dynamo, request *blacklist.DeleteRestrictionRequest) (*blacklist.BlacklistRecordDto, error) {
-	//Race condition here
-	record, err := client.GetRecordById(&request.RecordId)
-	if err != nil {
-		return nil, err
-	}
-	resultingRestrictions, err := record.DeleteRestriction(request.ClientId, request.ProductId)
-	if resultingRestrictions > 0 {
-		record, err = client.SaveRecord(record)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if err = client.DeleteRecord(&request.RecordId); err != nil {
-			return nil, err
-		}
-	}
-	return record.ToDto(), nil
-}
-
-func (receiver *BlacklistServer) DeleteBatchRestrictionFromRecord(stream blacklist.Blacklist_DeleteBatchRestrictionFromRecordServer) error {
-	client, err := clients.NewClient(receiver.Table)
-	in, err := stream.Recv()
-	if err == io.EOF {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for err != io.EOF {
-		result, err := receiver.deleteRestrictionFromRecord(client, in)
-		if err != nil {
-			return err
-		}
-		err = stream.Send(result)
-		if err != nil {
-			return err
-		}
-		in, err = stream.Recv()
-		if err != nil && err != io.EOF {
-			return err
-		}
-	}
-	return nil
 }

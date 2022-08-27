@@ -4,15 +4,15 @@ option go_package = "zorrero/blacklist";
 service Blacklist {
   rpc GetBlacklistRecord(BlacklistRecordOperationRequest) returns (BlacklistRecordDto);
   rpc GetBlacklistRecordBatch(stream BlacklistBatchRequest) returns (stream BlacklistRecordDto);
-  rpc GetBlacklistRecordByRecordId(BlacklistRecordGetByRecordIdRequest) returns (stream BlacklistRecordDto);
-  rpc GetBlacklistRecordByClientId(BlacklistRecordGetByClientIdRequest) returns (stream BlacklistRecordDto);
-  rpc GetBlacklistRecordByClientIdAndProductId(BlacklistRecordGetByClientIdAndProductIdRequest) returns (stream BlacklistRecordDto);
-  rpc GetBlacklistRecordByAddedDate(BlacklistRecordGetByAddedDateRequest) returns (stream BlacklistRecordDto);
+  rpc GetBlacklistRecordsQuery(BlacklistRecordQueriesRequest) returns (stream BlacklistRecordDto);
+  rpc GetBlacklistRecordsBetweenQuery(BlacklistRecordBetweenQueriesRequest) returns (stream BlacklistRecordDto);
   rpc SaveBlacklistRecord(BlacklistRecordOperationRequest) returns (BlacklistRecordDto);
   rpc SaveBlacklistRecordBatch(stream BlacklistBatchRequest) returns (stream BlacklistRecordDto);
-  rpc DeleteBlacklistRecord(BlacklistRecordOperationRequest) returns (BlacklistRecordDto);
-  rpc DeleteBatchBlacklistRecord(stream BlacklistBatchRequest) returns (stream BlacklistRecordDto);
+  rpc DeleteBlacklistRecord(BlacklistRecordOperationRequest) returns (Empty);
+  rpc DeleteBatchBlacklistRecord(stream BlacklistBatchRequest) returns (Empty);
 }
+
+message Empty {}
 
 message BlacklistRecordDto {
   string record_id = 1;
@@ -33,20 +33,36 @@ message BlacklistBatchRequest {
 
 //Get operations
 
-message BlacklistRecordGetByRecordIdRequest {
-  string record_id = 1;
+message BlacklistRecordQueriesRequest {
+  repeated BlacklistRecordQueryRequest queries = 1;
 }
 
-message BlacklistRecordGetByClientIdRequest {
-  string client_id = 1;
+message BlacklistRecordBetweenQueriesRequest {
+  repeated BlacklistRecordBetweenRequest queries = 1;
 }
 
-message BlacklistRecordGetByClientIdAndProductIdRequest {
-  string client_id = 1;
-  string product_id = 2;
+message BlacklistRecordQueryRequest {
+  SupportedQueryField field = 1;
+  SupportedQueryOperation operation = 2;
+  string value = 3;
 }
 
-message BlacklistRecordGetByAddedDateRequest {
-  string init_date = 1;
-  string end_date = 2;
+message BlacklistRecordBetweenRequest {
+  SupportedQueryField field = 1;
+  string init = 2;
+  string end = 3;
+}
+
+enum SupportedQueryField {
+  RECORD_ID = 0;
+  CLIENT_ID = 1;
+  PRODUCT_ID = 2;
+  ADDED_DATE = 4;
+}
+
+enum SupportedQueryOperation {
+  EQUALS = 0;
+  GREATER_THAN = 1;
+  LESSER_THAN = 2;
+  BEGINS_WITH = 3;
 }

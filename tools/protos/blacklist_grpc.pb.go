@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.21.2
-// source: protos/blacklist.proto
+// source: tools/protos/blacklist.proto
 
 package blacklist
 
@@ -22,14 +22,14 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BlacklistClient interface {
-	GetBlacklistRecordById(ctx context.Context, in *BlacklistGetRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
+	GetBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
 	GetBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordBatchClient, error)
-	SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordDto, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
+	GetBlacklistRecordsQuery(ctx context.Context, in *BlacklistRecordQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsQueryClient, error)
+	GetBlacklistRecordsBetweenQuery(ctx context.Context, in *BlacklistRecordBetweenQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsBetweenQueryClient, error)
+	SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
 	SaveBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBlacklistRecordBatchClient, error)
-	SaveRestrictionIntoRecord(ctx context.Context, in *SaveRestrictionRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
-	SaveBatchRestrictionIntoRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBatchRestrictionIntoRecordClient, error)
-	DeleteRestrictionFromRecord(ctx context.Context, in *DeleteRestrictionRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
-	DeleteBatchRestrictionFromRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_DeleteBatchRestrictionFromRecordClient, error)
+	DeleteBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeleteBatchBlacklistRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_DeleteBatchBlacklistRecordClient, error)
 }
 
 type blacklistClient struct {
@@ -40,9 +40,9 @@ func NewBlacklistClient(cc grpc.ClientConnInterface) BlacklistClient {
 	return &blacklistClient{cc}
 }
 
-func (c *blacklistClient) GetBlacklistRecordById(ctx context.Context, in *BlacklistGetRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
+func (c *blacklistClient) GetBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
 	out := new(BlacklistRecordDto)
-	err := c.cc.Invoke(ctx, "/Blacklist/GetBlacklistRecordById", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/Blacklist/GetBlacklistRecord", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (c *blacklistClient) GetBlacklistRecordBatch(ctx context.Context, opts ...g
 }
 
 type Blacklist_GetBlacklistRecordBatchClient interface {
-	Send(*BlacklistBatchGetRequest) error
+	Send(*BlacklistBatchRequest) error
 	Recv() (*BlacklistRecordDto, error)
 	grpc.ClientStream
 }
@@ -68,7 +68,7 @@ type blacklistGetBlacklistRecordBatchClient struct {
 	grpc.ClientStream
 }
 
-func (x *blacklistGetBlacklistRecordBatchClient) Send(m *BlacklistBatchGetRequest) error {
+func (x *blacklistGetBlacklistRecordBatchClient) Send(m *BlacklistBatchRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -80,7 +80,71 @@ func (x *blacklistGetBlacklistRecordBatchClient) Recv() (*BlacklistRecordDto, er
 	return m, nil
 }
 
-func (c *blacklistClient) SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordDto, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
+func (c *blacklistClient) GetBlacklistRecordsQuery(ctx context.Context, in *BlacklistRecordQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsQueryClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[1], "/Blacklist/GetBlacklistRecordsQuery", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &blacklistGetBlacklistRecordsQueryClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Blacklist_GetBlacklistRecordsQueryClient interface {
+	Recv() (*BlacklistRecordDto, error)
+	grpc.ClientStream
+}
+
+type blacklistGetBlacklistRecordsQueryClient struct {
+	grpc.ClientStream
+}
+
+func (x *blacklistGetBlacklistRecordsQueryClient) Recv() (*BlacklistRecordDto, error) {
+	m := new(BlacklistRecordDto)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *blacklistClient) GetBlacklistRecordsBetweenQuery(ctx context.Context, in *BlacklistRecordBetweenQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsBetweenQueryClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[2], "/Blacklist/GetBlacklistRecordsBetweenQuery", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &blacklistGetBlacklistRecordsBetweenQueryClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Blacklist_GetBlacklistRecordsBetweenQueryClient interface {
+	Recv() (*BlacklistRecordDto, error)
+	grpc.ClientStream
+}
+
+type blacklistGetBlacklistRecordsBetweenQueryClient struct {
+	grpc.ClientStream
+}
+
+func (x *blacklistGetBlacklistRecordsBetweenQueryClient) Recv() (*BlacklistRecordDto, error) {
+	m := new(BlacklistRecordDto)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *blacklistClient) SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
 	out := new(BlacklistRecordDto)
 	err := c.cc.Invoke(ctx, "/Blacklist/SaveBlacklistRecord", in, out, opts...)
 	if err != nil {
@@ -90,7 +154,7 @@ func (c *blacklistClient) SaveBlacklistRecord(ctx context.Context, in *Blacklist
 }
 
 func (c *blacklistClient) SaveBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBlacklistRecordBatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[1], "/Blacklist/SaveBlacklistRecordBatch", opts...)
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[3], "/Blacklist/SaveBlacklistRecordBatch", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +163,7 @@ func (c *blacklistClient) SaveBlacklistRecordBatch(ctx context.Context, opts ...
 }
 
 type Blacklist_SaveBlacklistRecordBatchClient interface {
-	Send(*BlacklistBatchSaveRequest) error
+	Send(*BlacklistBatchRequest) error
 	Recv() (*BlacklistRecordDto, error)
 	grpc.ClientStream
 }
@@ -108,7 +172,7 @@ type blacklistSaveBlacklistRecordBatchClient struct {
 	grpc.ClientStream
 }
 
-func (x *blacklistSaveBlacklistRecordBatchClient) Send(m *BlacklistBatchSaveRequest) error {
+func (x *blacklistSaveBlacklistRecordBatchClient) Send(m *BlacklistBatchRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -120,80 +184,43 @@ func (x *blacklistSaveBlacklistRecordBatchClient) Recv() (*BlacklistRecordDto, e
 	return m, nil
 }
 
-func (c *blacklistClient) SaveRestrictionIntoRecord(ctx context.Context, in *SaveRestrictionRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
-	out := new(BlacklistRecordDto)
-	err := c.cc.Invoke(ctx, "/Blacklist/SaveRestrictionIntoRecord", in, out, opts...)
+func (c *blacklistClient) DeleteBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/Blacklist/DeleteBlacklistRecord", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *blacklistClient) SaveBatchRestrictionIntoRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBatchRestrictionIntoRecordClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[2], "/Blacklist/SaveBatchRestrictionIntoRecord", opts...)
+func (c *blacklistClient) DeleteBatchBlacklistRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_DeleteBatchBlacklistRecordClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[4], "/Blacklist/DeleteBatchBlacklistRecord", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &blacklistSaveBatchRestrictionIntoRecordClient{stream}
+	x := &blacklistDeleteBatchBlacklistRecordClient{stream}
 	return x, nil
 }
 
-type Blacklist_SaveBatchRestrictionIntoRecordClient interface {
-	Send(*SaveRestrictionRequest) error
-	Recv() (*BlacklistRecordDto, error)
+type Blacklist_DeleteBatchBlacklistRecordClient interface {
+	Send(*BlacklistBatchRequest) error
+	CloseAndRecv() (*Empty, error)
 	grpc.ClientStream
 }
 
-type blacklistSaveBatchRestrictionIntoRecordClient struct {
+type blacklistDeleteBatchBlacklistRecordClient struct {
 	grpc.ClientStream
 }
 
-func (x *blacklistSaveBatchRestrictionIntoRecordClient) Send(m *SaveRestrictionRequest) error {
+func (x *blacklistDeleteBatchBlacklistRecordClient) Send(m *BlacklistBatchRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *blacklistSaveBatchRestrictionIntoRecordClient) Recv() (*BlacklistRecordDto, error) {
-	m := new(BlacklistRecordDto)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
+func (x *blacklistDeleteBatchBlacklistRecordClient) CloseAndRecv() (*Empty, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	return m, nil
-}
-
-func (c *blacklistClient) DeleteRestrictionFromRecord(ctx context.Context, in *DeleteRestrictionRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
-	out := new(BlacklistRecordDto)
-	err := c.cc.Invoke(ctx, "/Blacklist/DeleteRestrictionFromRecord", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *blacklistClient) DeleteBatchRestrictionFromRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_DeleteBatchRestrictionFromRecordClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[3], "/Blacklist/DeleteBatchRestrictionFromRecord", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &blacklistDeleteBatchRestrictionFromRecordClient{stream}
-	return x, nil
-}
-
-type Blacklist_DeleteBatchRestrictionFromRecordClient interface {
-	Send(*DeleteRestrictionRequest) error
-	Recv() (*BlacklistRecordDto, error)
-	grpc.ClientStream
-}
-
-type blacklistDeleteBatchRestrictionFromRecordClient struct {
-	grpc.ClientStream
-}
-
-func (x *blacklistDeleteBatchRestrictionFromRecordClient) Send(m *DeleteRestrictionRequest) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *blacklistDeleteBatchRestrictionFromRecordClient) Recv() (*BlacklistRecordDto, error) {
-	m := new(BlacklistRecordDto)
+	m := new(Empty)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -204,14 +231,14 @@ func (x *blacklistDeleteBatchRestrictionFromRecordClient) Recv() (*BlacklistReco
 // All implementations must embed UnimplementedBlacklistServer
 // for forward compatibility
 type BlacklistServer interface {
-	GetBlacklistRecordById(context.Context, *BlacklistGetRequest) (*BlacklistRecordDto, error)
+	GetBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error)
 	GetBlacklistRecordBatch(Blacklist_GetBlacklistRecordBatchServer) error
-	SaveBlacklistRecord(context.Context, *BlacklistRecordDto) (*BlacklistRecordDto, error)
+	GetBlacklistRecordsQuery(*BlacklistRecordQueriesRequest, Blacklist_GetBlacklistRecordsQueryServer) error
+	GetBlacklistRecordsBetweenQuery(*BlacklistRecordBetweenQueriesRequest, Blacklist_GetBlacklistRecordsBetweenQueryServer) error
+	SaveBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error)
 	SaveBlacklistRecordBatch(Blacklist_SaveBlacklistRecordBatchServer) error
-	SaveRestrictionIntoRecord(context.Context, *SaveRestrictionRequest) (*BlacklistRecordDto, error)
-	SaveBatchRestrictionIntoRecord(Blacklist_SaveBatchRestrictionIntoRecordServer) error
-	DeleteRestrictionFromRecord(context.Context, *DeleteRestrictionRequest) (*BlacklistRecordDto, error)
-	DeleteBatchRestrictionFromRecord(Blacklist_DeleteBatchRestrictionFromRecordServer) error
+	DeleteBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*Empty, error)
+	DeleteBatchBlacklistRecord(Blacklist_DeleteBatchBlacklistRecordServer) error
 	mustEmbedUnimplementedBlacklistServer()
 }
 
@@ -219,29 +246,29 @@ type BlacklistServer interface {
 type UnimplementedBlacklistServer struct {
 }
 
-func (UnimplementedBlacklistServer) GetBlacklistRecordById(context.Context, *BlacklistGetRequest) (*BlacklistRecordDto, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlacklistRecordById not implemented")
+func (UnimplementedBlacklistServer) GetBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlacklistRecord not implemented")
 }
 func (UnimplementedBlacklistServer) GetBlacklistRecordBatch(Blacklist_GetBlacklistRecordBatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetBlacklistRecordBatch not implemented")
 }
-func (UnimplementedBlacklistServer) SaveBlacklistRecord(context.Context, *BlacklistRecordDto) (*BlacklistRecordDto, error) {
+func (UnimplementedBlacklistServer) GetBlacklistRecordsQuery(*BlacklistRecordQueriesRequest, Blacklist_GetBlacklistRecordsQueryServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetBlacklistRecordsQuery not implemented")
+}
+func (UnimplementedBlacklistServer) GetBlacklistRecordsBetweenQuery(*BlacklistRecordBetweenQueriesRequest, Blacklist_GetBlacklistRecordsBetweenQueryServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetBlacklistRecordsBetweenQuery not implemented")
+}
+func (UnimplementedBlacklistServer) SaveBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveBlacklistRecord not implemented")
 }
 func (UnimplementedBlacklistServer) SaveBlacklistRecordBatch(Blacklist_SaveBlacklistRecordBatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method SaveBlacklistRecordBatch not implemented")
 }
-func (UnimplementedBlacklistServer) SaveRestrictionIntoRecord(context.Context, *SaveRestrictionRequest) (*BlacklistRecordDto, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SaveRestrictionIntoRecord not implemented")
+func (UnimplementedBlacklistServer) DeleteBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteBlacklistRecord not implemented")
 }
-func (UnimplementedBlacklistServer) SaveBatchRestrictionIntoRecord(Blacklist_SaveBatchRestrictionIntoRecordServer) error {
-	return status.Errorf(codes.Unimplemented, "method SaveBatchRestrictionIntoRecord not implemented")
-}
-func (UnimplementedBlacklistServer) DeleteRestrictionFromRecord(context.Context, *DeleteRestrictionRequest) (*BlacklistRecordDto, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteRestrictionFromRecord not implemented")
-}
-func (UnimplementedBlacklistServer) DeleteBatchRestrictionFromRecord(Blacklist_DeleteBatchRestrictionFromRecordServer) error {
-	return status.Errorf(codes.Unimplemented, "method DeleteBatchRestrictionFromRecord not implemented")
+func (UnimplementedBlacklistServer) DeleteBatchBlacklistRecord(Blacklist_DeleteBatchBlacklistRecordServer) error {
+	return status.Errorf(codes.Unimplemented, "method DeleteBatchBlacklistRecord not implemented")
 }
 func (UnimplementedBlacklistServer) mustEmbedUnimplementedBlacklistServer() {}
 
@@ -256,20 +283,20 @@ func RegisterBlacklistServer(s grpc.ServiceRegistrar, srv BlacklistServer) {
 	s.RegisterService(&Blacklist_ServiceDesc, srv)
 }
 
-func _Blacklist_GetBlacklistRecordById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlacklistGetRequest)
+func _Blacklist_GetBlacklistRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlacklistRecordOperationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BlacklistServer).GetBlacklistRecordById(ctx, in)
+		return srv.(BlacklistServer).GetBlacklistRecord(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Blacklist/GetBlacklistRecordById",
+		FullMethod: "/Blacklist/GetBlacklistRecord",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlacklistServer).GetBlacklistRecordById(ctx, req.(*BlacklistGetRequest))
+		return srv.(BlacklistServer).GetBlacklistRecord(ctx, req.(*BlacklistRecordOperationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -280,7 +307,7 @@ func _Blacklist_GetBlacklistRecordBatch_Handler(srv interface{}, stream grpc.Ser
 
 type Blacklist_GetBlacklistRecordBatchServer interface {
 	Send(*BlacklistRecordDto) error
-	Recv() (*BlacklistBatchGetRequest, error)
+	Recv() (*BlacklistBatchRequest, error)
 	grpc.ServerStream
 }
 
@@ -292,16 +319,58 @@ func (x *blacklistGetBlacklistRecordBatchServer) Send(m *BlacklistRecordDto) err
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *blacklistGetBlacklistRecordBatchServer) Recv() (*BlacklistBatchGetRequest, error) {
-	m := new(BlacklistBatchGetRequest)
+func (x *blacklistGetBlacklistRecordBatchServer) Recv() (*BlacklistBatchRequest, error) {
+	m := new(BlacklistBatchRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
+func _Blacklist_GetBlacklistRecordsQuery_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(BlacklistRecordQueriesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlacklistServer).GetBlacklistRecordsQuery(m, &blacklistGetBlacklistRecordsQueryServer{stream})
+}
+
+type Blacklist_GetBlacklistRecordsQueryServer interface {
+	Send(*BlacklistRecordDto) error
+	grpc.ServerStream
+}
+
+type blacklistGetBlacklistRecordsQueryServer struct {
+	grpc.ServerStream
+}
+
+func (x *blacklistGetBlacklistRecordsQueryServer) Send(m *BlacklistRecordDto) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Blacklist_GetBlacklistRecordsBetweenQuery_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(BlacklistRecordBetweenQueriesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlacklistServer).GetBlacklistRecordsBetweenQuery(m, &blacklistGetBlacklistRecordsBetweenQueryServer{stream})
+}
+
+type Blacklist_GetBlacklistRecordsBetweenQueryServer interface {
+	Send(*BlacklistRecordDto) error
+	grpc.ServerStream
+}
+
+type blacklistGetBlacklistRecordsBetweenQueryServer struct {
+	grpc.ServerStream
+}
+
+func (x *blacklistGetBlacklistRecordsBetweenQueryServer) Send(m *BlacklistRecordDto) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _Blacklist_SaveBlacklistRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlacklistRecordDto)
+	in := new(BlacklistRecordOperationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -313,7 +382,7 @@ func _Blacklist_SaveBlacklistRecord_Handler(srv interface{}, ctx context.Context
 		FullMethod: "/Blacklist/SaveBlacklistRecord",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlacklistServer).SaveBlacklistRecord(ctx, req.(*BlacklistRecordDto))
+		return srv.(BlacklistServer).SaveBlacklistRecord(ctx, req.(*BlacklistRecordOperationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -324,7 +393,7 @@ func _Blacklist_SaveBlacklistRecordBatch_Handler(srv interface{}, stream grpc.Se
 
 type Blacklist_SaveBlacklistRecordBatchServer interface {
 	Send(*BlacklistRecordDto) error
-	Recv() (*BlacklistBatchSaveRequest, error)
+	Recv() (*BlacklistBatchRequest, error)
 	grpc.ServerStream
 }
 
@@ -336,96 +405,52 @@ func (x *blacklistSaveBlacklistRecordBatchServer) Send(m *BlacklistRecordDto) er
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *blacklistSaveBlacklistRecordBatchServer) Recv() (*BlacklistBatchSaveRequest, error) {
-	m := new(BlacklistBatchSaveRequest)
+func (x *blacklistSaveBlacklistRecordBatchServer) Recv() (*BlacklistBatchRequest, error) {
+	m := new(BlacklistBatchRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func _Blacklist_SaveRestrictionIntoRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SaveRestrictionRequest)
+func _Blacklist_DeleteBlacklistRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlacklistRecordOperationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BlacklistServer).SaveRestrictionIntoRecord(ctx, in)
+		return srv.(BlacklistServer).DeleteBlacklistRecord(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Blacklist/SaveRestrictionIntoRecord",
+		FullMethod: "/Blacklist/DeleteBlacklistRecord",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlacklistServer).SaveRestrictionIntoRecord(ctx, req.(*SaveRestrictionRequest))
+		return srv.(BlacklistServer).DeleteBlacklistRecord(ctx, req.(*BlacklistRecordOperationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Blacklist_SaveBatchRestrictionIntoRecord_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(BlacklistServer).SaveBatchRestrictionIntoRecord(&blacklistSaveBatchRestrictionIntoRecordServer{stream})
+func _Blacklist_DeleteBatchBlacklistRecord_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(BlacklistServer).DeleteBatchBlacklistRecord(&blacklistDeleteBatchBlacklistRecordServer{stream})
 }
 
-type Blacklist_SaveBatchRestrictionIntoRecordServer interface {
-	Send(*BlacklistRecordDto) error
-	Recv() (*SaveRestrictionRequest, error)
+type Blacklist_DeleteBatchBlacklistRecordServer interface {
+	SendAndClose(*Empty) error
+	Recv() (*BlacklistBatchRequest, error)
 	grpc.ServerStream
 }
 
-type blacklistSaveBatchRestrictionIntoRecordServer struct {
+type blacklistDeleteBatchBlacklistRecordServer struct {
 	grpc.ServerStream
 }
 
-func (x *blacklistSaveBatchRestrictionIntoRecordServer) Send(m *BlacklistRecordDto) error {
+func (x *blacklistDeleteBatchBlacklistRecordServer) SendAndClose(m *Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *blacklistSaveBatchRestrictionIntoRecordServer) Recv() (*SaveRestrictionRequest, error) {
-	m := new(SaveRestrictionRequest)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func _Blacklist_DeleteRestrictionFromRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteRestrictionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlacklistServer).DeleteRestrictionFromRecord(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/Blacklist/DeleteRestrictionFromRecord",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlacklistServer).DeleteRestrictionFromRecord(ctx, req.(*DeleteRestrictionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Blacklist_DeleteBatchRestrictionFromRecord_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(BlacklistServer).DeleteBatchRestrictionFromRecord(&blacklistDeleteBatchRestrictionFromRecordServer{stream})
-}
-
-type Blacklist_DeleteBatchRestrictionFromRecordServer interface {
-	Send(*BlacklistRecordDto) error
-	Recv() (*DeleteRestrictionRequest, error)
-	grpc.ServerStream
-}
-
-type blacklistDeleteBatchRestrictionFromRecordServer struct {
-	grpc.ServerStream
-}
-
-func (x *blacklistDeleteBatchRestrictionFromRecordServer) Send(m *BlacklistRecordDto) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *blacklistDeleteBatchRestrictionFromRecordServer) Recv() (*DeleteRestrictionRequest, error) {
-	m := new(DeleteRestrictionRequest)
+func (x *blacklistDeleteBatchBlacklistRecordServer) Recv() (*BlacklistBatchRequest, error) {
+	m := new(BlacklistBatchRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -440,20 +465,16 @@ var Blacklist_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*BlacklistServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetBlacklistRecordById",
-			Handler:    _Blacklist_GetBlacklistRecordById_Handler,
+			MethodName: "GetBlacklistRecord",
+			Handler:    _Blacklist_GetBlacklistRecord_Handler,
 		},
 		{
 			MethodName: "SaveBlacklistRecord",
 			Handler:    _Blacklist_SaveBlacklistRecord_Handler,
 		},
 		{
-			MethodName: "SaveRestrictionIntoRecord",
-			Handler:    _Blacklist_SaveRestrictionIntoRecord_Handler,
-		},
-		{
-			MethodName: "DeleteRestrictionFromRecord",
-			Handler:    _Blacklist_DeleteRestrictionFromRecord_Handler,
+			MethodName: "DeleteBlacklistRecord",
+			Handler:    _Blacklist_DeleteBlacklistRecord_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -464,23 +485,26 @@ var Blacklist_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 		{
+			StreamName:    "GetBlacklistRecordsQuery",
+			Handler:       _Blacklist_GetBlacklistRecordsQuery_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetBlacklistRecordsBetweenQuery",
+			Handler:       _Blacklist_GetBlacklistRecordsBetweenQuery_Handler,
+			ServerStreams: true,
+		},
+		{
 			StreamName:    "SaveBlacklistRecordBatch",
 			Handler:       _Blacklist_SaveBlacklistRecordBatch_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "SaveBatchRestrictionIntoRecord",
-			Handler:       _Blacklist_SaveBatchRestrictionIntoRecord_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
-		},
-		{
-			StreamName:    "DeleteBatchRestrictionFromRecord",
-			Handler:       _Blacklist_DeleteBatchRestrictionFromRecord_Handler,
-			ServerStreams: true,
+			StreamName:    "DeleteBatchBlacklistRecord",
+			Handler:       _Blacklist_DeleteBatchBlacklistRecord_Handler,
 			ClientStreams: true,
 		},
 	},
-	Metadata: "protos/blacklist.proto",
+	Metadata: "tools/protos/blacklist.proto",
 }
