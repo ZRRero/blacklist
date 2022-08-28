@@ -100,7 +100,7 @@ func (receiver *BlacklistClient) getBatchRequestFromIds(ids []*string) map[strin
 	return requestItems
 }
 
-func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query, betweenQueries []*models.BetweenQuery) ([]*models.Record, error) {
+func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query, betweenQueries []*models.BetweenQuery, lastRecord map[string]*dynamodb.AttributeValue) ([]*models.Record, map[string]*dynamodb.AttributeValue, error) {
 	queryFilter, queriesInFilter := getFilterByQueries(queries)
 	betweenFilter, queriesInBetweenFilter := getFilterByBetweenQueries(betweenQueries)
 	var filter expression.ConditionBuilder
@@ -118,23 +118,24 @@ func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query, be
 	}
 	queryExpression, err := expression.NewBuilder().WithFilter(filter).Build()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	input := &dynamodb.ScanInput{
 		ExpressionAttributeNames:  queryExpression.Names(),
 		ExpressionAttributeValues: queryExpression.Values(),
 		FilterExpression:          queryExpression.Filter(),
 		TableName:                 &receiver.table,
+		ExclusiveStartKey:         lastRecord,
 	}
 	result, err := receiver.client.Scan(input)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	records, err := receiver.parseDynamoRecords(result.Items)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return records, nil
+	return records, result.LastEvaluatedKey, nil
 }
 
 func getFilterByQueries(queries []*models.Query) (expression.ConditionBuilder, int) {

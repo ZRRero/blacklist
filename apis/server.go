@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"io"
 	"sync"
 )
@@ -91,7 +92,19 @@ func (receiver *BlacklistServer) GetBlacklistRecordsQuery(request *blacklist.Bla
 	for _, betweenQuery := range request.BetweenQueries {
 		betweenQueries = append(betweenQueries, models.FromQueryBetweenRequest(betweenQuery))
 	}
-	result, err := client.GetRecordsByQueries(queries, betweenQueries)
+	var result []*models.Record
+	var lastRecord map[string]*dynamodb.AttributeValue
+	for result, lastRecord, err = client.GetRecordsByQueries(queries, betweenQueries, nil); lastRecord != nil; result, lastRecord, err = client.GetRecordsByQueries(queries, betweenQueries, lastRecord) {
+		if err != nil {
+			return err
+		}
+		for _, record := range result {
+			err := stream.Send(record.ToDto())
+			if err != nil {
+				return err
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
