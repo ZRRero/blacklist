@@ -100,31 +100,33 @@ func (receiver *BlacklistClient) getBatchRequestFromIds(ids []*string) map[strin
 	return requestItems
 }
 
-func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query) ([]*models.Record, error) {
-	queryExpressionBuilder := expression.NewBuilder()
-	for _, query := range queries {
-		var keyExpression expression.KeyConditionBuilder
-		switch query.Operand {
-		case "EQUALS":
-			keyExpression = expression.Key(query.Field).Equal(expression.Value(query.Value))
-		case "GREATER_THAN":
-			keyExpression = expression.Key(query.Field).GreaterThan(expression.Value(query.Value))
-		case "LESSER_THAN":
-			keyExpression = expression.Key(query.Field).LessThan(expression.Value(query.Value))
-		case "BEGINS_WITH":
-			keyExpression = expression.Key(query.Field).BeginsWith(query.Value)
-		}
-		queryExpressionBuilder.WithKeyCondition(keyExpression)
+func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query, betweenQueries []*models.BetweenQuery) ([]*models.Record, error) {
+	queryFilter, queriesInFilter := getFilterByQueries(queries)
+	betweenFilter, queriesInBetweenFilter := getFilterByBetweenQueries(betweenQueries)
+	var filter expression.ConditionBuilder
+	if queriesInFilter == 0 && queriesInBetweenFilter == 0 {
+		log.Print("As there are no queries a full scan will be performed")
 	}
-	queryExpression, err := queryExpressionBuilder.Build()
+	if queriesInFilter > 0 && queriesInBetweenFilter == 0 {
+		filter = queryFilter
+	}
+	if queriesInFilter == 0 && queriesInBetweenFilter > 0 {
+		filter = betweenFilter
+	}
+	if queriesInFilter > 0 && queriesInBetweenFilter > 0 {
+		filter = queryFilter.And(betweenFilter)
+	}
+	queryExpression, err := expression.NewBuilder().WithFilter(filter).Build()
 	if err != nil {
 		return nil, err
 	}
-	input := &dynamodb.QueryInput{
-		KeyConditionExpression: queryExpression.KeyCondition(),
-		TableName:              &receiver.table,
+	input := &dynamodb.ScanInput{
+		ExpressionAttributeNames:  queryExpression.Names(),
+		ExpressionAttributeValues: queryExpression.Values(),
+		FilterExpression:          queryExpression.Filter(),
+		TableName:                 &receiver.table,
 	}
-	result, err := receiver.client.Query(input)
+	result, err := receiver.client.Scan(input)
 	if err != nil {
 		return nil, err
 	}
@@ -135,35 +137,45 @@ func (receiver *BlacklistClient) GetRecordsByQueries(queries []*models.Query) ([
 	return records, nil
 }
 
-func (receiver *BlacklistClient) GetRecordsBetweenValues(queries []*models.BetweenQuery) ([]*models.Record, error) {
-	queryExpressionBuilder := expression.NewBuilder()
-	for _, query := range queries {
-		keyExpression := expression.Key(query.Field).Between(expression.Value(query.Init), expression.Value(query.End))
-		queryExpressionBuilder.WithKeyCondition(keyExpression)
+func getFilterByQueries(queries []*models.Query) (expression.ConditionBuilder, int) {
+	var filter expression.ConditionBuilder
+	for index, query := range queries {
+		var currentFilter expression.ConditionBuilder
+		switch query.Operand {
+		case "EQUALS":
+			currentFilter = expression.Equal(expression.Name(query.Field), expression.Value(query.Value))
+		case "GREATER_THAN":
+			currentFilter = expression.GreaterThan(expression.Name(query.Field), expression.Value(query.Value))
+		case "LESSER_THAN":
+			currentFilter = expression.LessThan(expression.Name(query.Field), expression.Value(query.Value))
+		case "BEGINS_WITH":
+			currentFilter = expression.BeginsWith(expression.Name(query.Field), query.Value)
+		}
+		if index == 0 {
+			filter = currentFilter
+		} else {
+			filter = filter.And(currentFilter)
+		}
 	}
-	queryExpression, err := queryExpressionBuilder.Build()
-	if err != nil {
-		return nil, err
+	return filter, len(queries)
+}
+
+func getFilterByBetweenQueries(queries []*models.BetweenQuery) (expression.ConditionBuilder, int) {
+	var filter expression.ConditionBuilder
+	for index, query := range queries {
+		currentFilter := expression.Between(expression.Name(query.Field), expression.Value(query.Init), expression.Value(query.End))
+		if index == 0 {
+			filter = currentFilter
+		} else {
+			filter = filter.And(currentFilter)
+		}
 	}
-	input := &dynamodb.QueryInput{
-		KeyConditionExpression: queryExpression.KeyCondition(),
-		TableName:              &receiver.table,
-	}
-	result, err := receiver.client.Query(input)
-	if err != nil {
-		return nil, err
-	}
-	records, err := receiver.parseDynamoRecords(result.Items)
-	if err != nil {
-		return nil, err
-	}
-	return records, nil
+	return filter, len(queries)
 }
 
 //Save
 
 func (receiver *BlacklistClient) SaveRecord(record *models.Record) (*models.Record, error) {
-	log.Printf("Table: %s", receiver.table)
 	input := &dynamodb.PutItemInput{
 		TableName: &receiver.table,
 		Item:      record.ToDynamoItem(),

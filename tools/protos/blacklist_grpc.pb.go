@@ -25,7 +25,6 @@ type BlacklistClient interface {
 	GetBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
 	GetBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordBatchClient, error)
 	GetBlacklistRecordsQuery(ctx context.Context, in *BlacklistRecordQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsQueryClient, error)
-	GetBlacklistRecordsBetweenQuery(ctx context.Context, in *BlacklistRecordBetweenQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsBetweenQueryClient, error)
 	SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error)
 	SaveBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBlacklistRecordBatchClient, error)
 	DeleteBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -112,38 +111,6 @@ func (x *blacklistGetBlacklistRecordsQueryClient) Recv() (*BlacklistRecordDto, e
 	return m, nil
 }
 
-func (c *blacklistClient) GetBlacklistRecordsBetweenQuery(ctx context.Context, in *BlacklistRecordBetweenQueriesRequest, opts ...grpc.CallOption) (Blacklist_GetBlacklistRecordsBetweenQueryClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[2], "/Blacklist/GetBlacklistRecordsBetweenQuery", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &blacklistGetBlacklistRecordsBetweenQueryClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Blacklist_GetBlacklistRecordsBetweenQueryClient interface {
-	Recv() (*BlacklistRecordDto, error)
-	grpc.ClientStream
-}
-
-type blacklistGetBlacklistRecordsBetweenQueryClient struct {
-	grpc.ClientStream
-}
-
-func (x *blacklistGetBlacklistRecordsBetweenQueryClient) Recv() (*BlacklistRecordDto, error) {
-	m := new(BlacklistRecordDto)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func (c *blacklistClient) SaveBlacklistRecord(ctx context.Context, in *BlacklistRecordOperationRequest, opts ...grpc.CallOption) (*BlacklistRecordDto, error) {
 	out := new(BlacklistRecordDto)
 	err := c.cc.Invoke(ctx, "/Blacklist/SaveBlacklistRecord", in, out, opts...)
@@ -154,7 +121,7 @@ func (c *blacklistClient) SaveBlacklistRecord(ctx context.Context, in *Blacklist
 }
 
 func (c *blacklistClient) SaveBlacklistRecordBatch(ctx context.Context, opts ...grpc.CallOption) (Blacklist_SaveBlacklistRecordBatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[3], "/Blacklist/SaveBlacklistRecordBatch", opts...)
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[2], "/Blacklist/SaveBlacklistRecordBatch", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +161,7 @@ func (c *blacklistClient) DeleteBlacklistRecord(ctx context.Context, in *Blackli
 }
 
 func (c *blacklistClient) DeleteBatchBlacklistRecord(ctx context.Context, opts ...grpc.CallOption) (Blacklist_DeleteBatchBlacklistRecordClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[4], "/Blacklist/DeleteBatchBlacklistRecord", opts...)
+	stream, err := c.cc.NewStream(ctx, &Blacklist_ServiceDesc.Streams[3], "/Blacklist/DeleteBatchBlacklistRecord", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +201,6 @@ type BlacklistServer interface {
 	GetBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error)
 	GetBlacklistRecordBatch(Blacklist_GetBlacklistRecordBatchServer) error
 	GetBlacklistRecordsQuery(*BlacklistRecordQueriesRequest, Blacklist_GetBlacklistRecordsQueryServer) error
-	GetBlacklistRecordsBetweenQuery(*BlacklistRecordBetweenQueriesRequest, Blacklist_GetBlacklistRecordsBetweenQueryServer) error
 	SaveBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error)
 	SaveBlacklistRecordBatch(Blacklist_SaveBlacklistRecordBatchServer) error
 	DeleteBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*Empty, error)
@@ -254,9 +220,6 @@ func (UnimplementedBlacklistServer) GetBlacklistRecordBatch(Blacklist_GetBlackli
 }
 func (UnimplementedBlacklistServer) GetBlacklistRecordsQuery(*BlacklistRecordQueriesRequest, Blacklist_GetBlacklistRecordsQueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetBlacklistRecordsQuery not implemented")
-}
-func (UnimplementedBlacklistServer) GetBlacklistRecordsBetweenQuery(*BlacklistRecordBetweenQueriesRequest, Blacklist_GetBlacklistRecordsBetweenQueryServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetBlacklistRecordsBetweenQuery not implemented")
 }
 func (UnimplementedBlacklistServer) SaveBlacklistRecord(context.Context, *BlacklistRecordOperationRequest) (*BlacklistRecordDto, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveBlacklistRecord not implemented")
@@ -345,27 +308,6 @@ type blacklistGetBlacklistRecordsQueryServer struct {
 }
 
 func (x *blacklistGetBlacklistRecordsQueryServer) Send(m *BlacklistRecordDto) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func _Blacklist_GetBlacklistRecordsBetweenQuery_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(BlacklistRecordBetweenQueriesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(BlacklistServer).GetBlacklistRecordsBetweenQuery(m, &blacklistGetBlacklistRecordsBetweenQueryServer{stream})
-}
-
-type Blacklist_GetBlacklistRecordsBetweenQueryServer interface {
-	Send(*BlacklistRecordDto) error
-	grpc.ServerStream
-}
-
-type blacklistGetBlacklistRecordsBetweenQueryServer struct {
-	grpc.ServerStream
-}
-
-func (x *blacklistGetBlacklistRecordsBetweenQueryServer) Send(m *BlacklistRecordDto) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -487,11 +429,6 @@ var Blacklist_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GetBlacklistRecordsQuery",
 			Handler:       _Blacklist_GetBlacklistRecordsQuery_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "GetBlacklistRecordsBetweenQuery",
-			Handler:       _Blacklist_GetBlacklistRecordsBetweenQuery_Handler,
 			ServerStreams: true,
 		},
 		{

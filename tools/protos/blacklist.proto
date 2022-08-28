@@ -5,7 +5,6 @@ service Blacklist {
   rpc GetBlacklistRecord(BlacklistRecordOperationRequest) returns (BlacklistRecordDto);
   rpc GetBlacklistRecordBatch(stream BlacklistBatchRequest) returns (stream BlacklistRecordDto);
   rpc GetBlacklistRecordsQuery(BlacklistRecordQueriesRequest) returns (stream BlacklistRecordDto);
-  rpc GetBlacklistRecordsBetweenQuery(BlacklistRecordBetweenQueriesRequest) returns (stream BlacklistRecordDto);
   rpc SaveBlacklistRecord(BlacklistRecordOperationRequest) returns (BlacklistRecordDto);
   rpc SaveBlacklistRecordBatch(stream BlacklistBatchRequest) returns (stream BlacklistRecordDto);
   rpc DeleteBlacklistRecord(BlacklistRecordOperationRequest) returns (Empty);
@@ -35,6 +34,7 @@ message BlacklistBatchRequest {
 
 message BlacklistRecordQueriesRequest {
   repeated BlacklistRecordQueryRequest queries = 1;
+  repeated BlacklistRecordBetweenRequest betweenQueries = 2;
 }
 
 message BlacklistRecordBetweenQueriesRequest {
@@ -54,10 +54,10 @@ message BlacklistRecordBetweenRequest {
 }
 
 enum SupportedQueryField {
-  RECORD_ID = 0;
-  CLIENT_ID = 1;
-  PRODUCT_ID = 2;
-  ADDED_DATE = 4;
+  record_id = 0;
+  client_id = 1;
+  product_id = 2;
+  added_date = 4;
 }
 
 enum SupportedQueryOperation {

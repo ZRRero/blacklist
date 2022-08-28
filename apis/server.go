@@ -14,7 +14,7 @@ import (
 var (
 	notFound          = "given record %s does not exist"
 	maxLengthExceeded = "maximum batch size is %d and given batch has %d records"
-	idFormat          = "%s%s%s"
+	idFormat          = "%s:%s:%s"
 )
 
 func getIdFromRequest(request *blacklist.BlacklistRecordOperationRequest) string {
@@ -84,32 +84,14 @@ func (receiver *BlacklistServer) GetBlacklistRecordsQuery(request *blacklist.Bla
 		return err
 	}
 	queries := make([]*models.Query, 0, 10)
+	betweenQueries := make([]*models.BetweenQuery, 0, 10)
 	for _, query := range request.Queries {
 		queries = append(queries, models.FromQueryRequest(query))
 	}
-	result, err := client.GetRecordsByQueries(queries)
-	if err != nil {
-		return err
+	for _, betweenQuery := range request.BetweenQueries {
+		betweenQueries = append(betweenQueries, models.FromQueryBetweenRequest(betweenQuery))
 	}
-	for _, record := range result {
-		err := stream.Send(record.ToDto())
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (receiver *BlacklistServer) GetBlacklistRecordsBetweenQuery(request *blacklist.BlacklistRecordBetweenQueriesRequest, stream blacklist.Blacklist_GetBlacklistRecordsBetweenQueryServer) error {
-	client, err := clients.NewClient(receiver.Table)
-	if err != nil {
-		return err
-	}
-	queries := make([]*models.BetweenQuery, 0, 10)
-	for _, query := range request.Queries {
-		queries = append(queries, models.FromQueryBetweenRequest(query))
-	}
-	result, err := client.GetRecordsBetweenValues(queries)
+	result, err := client.GetRecordsByQueries(queries, betweenQueries)
 	if err != nil {
 		return err
 	}
